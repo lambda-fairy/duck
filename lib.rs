@@ -30,6 +30,7 @@
 ///
 /// See the top-level documentation for how to use this trait.
 pub trait PeekingExt: Iterator + Sized {
+    #[inline]
     fn peeking(self) -> Goose<Self> {
         Goose::new(self)
     }
@@ -117,16 +118,19 @@ pub struct Goose<I: Iterator> {
 }
 
 impl<I: Iterator> Goose<I> {
+    #[inline]
     fn new(iter: I) -> Self {
         Goose { iter, peeked: None }
     }
 
     /// Inspect the next element of the iterator without consuming it.
+    #[inline]
     pub fn peek(&mut self) -> Option<&I::Item> {
         Anatid::peek(self)
     }
 
     /// Extends the iterator to peek two elements instead of one.
+    #[inline]
     pub fn peeking(self) -> Duck<Self> {
         Duck::new(self)
     }
@@ -138,6 +142,7 @@ impl_iterator!(Goose);
 impl<'a, I: Iterator> Anatid<'a> for Goose<I> where I::Item: 'a {
     type PeekItem = &'a I::Item;
 
+    #[inline]
     fn peek(&'a mut self) -> Option<&'a I::Item> {
         if self.peeked.is_none() {
             self.peeked = Some(self.iter.next());
@@ -158,12 +163,14 @@ pub struct Duck<I: Iterator> {
 }
 
 impl<'a, I: Anatid<'a>> Duck<I> {
+    #[inline]
     fn new(iter: I) -> Self {
         Duck { iter, peeked: None }
     }
 
     /// Inspect the next *n* elements in the iterator without consuming them,
     /// where *n* is the number of `Duck` or `Goose` types in the stack.
+    #[inline]
     pub fn peek(&'a mut self) -> Option<(&'a I::Item, Option<<I as Anatid<'a>>::PeekItem>)> {
         Anatid::peek(self)
     }
@@ -171,6 +178,7 @@ impl<'a, I: Anatid<'a>> Duck<I> {
 
 impl<'a, I: Anatid<'a>> Duck<I> where I::Item: 'a {
     /// Extends the iterator to peek one more element.
+    #[inline]
     pub fn peeking(self) -> Duck<Self> {
         Duck::new(self)
     }
@@ -182,6 +190,7 @@ impl_iterator!(Duck);
 impl<'a, I: Anatid<'a>> Anatid<'a> for Duck<I> where I::Item: 'a {
     type PeekItem = (&'a I::Item, Option<I::PeekItem>);
 
+    #[inline]
     fn peek(&'a mut self) -> Option<Self::PeekItem> {
         if self.peeked.is_none() {
             self.peeked = Some(self.iter.next());
