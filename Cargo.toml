@@ -1,0 +1,19 @@
+[package]
+
+name = "duck"
+# When releasing a new version, please update html_root_url in lib.rs
+version = "0.1.0"
+authors = ["Chris Wong <lambda.fairy@gmail.com>"]
+
+license = "MIT/Apache-2.0"
+documentation = "https://docs.rs/duck/"
+repository = "https://github.com/lfairy/duck"
+description = "Like `Iterator::peekable`, but can be stacked an arbitrary number of times."
+keywords = ["iterator", "peek"]
+categories = ["rust-patterns"]
+
+[lib]
+path = "lib.rs"
+
+[badges]
+travis-ci = { repository = "lfairy/duck" }
