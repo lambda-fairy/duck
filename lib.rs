@@ -30,7 +30,7 @@
 //! [1]: https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.peekable
 //! [2]: https://github.com/rust-lang/rfcs/pull/1598
 
-#![doc(html_root_url = "https://docs.rs/duck/0.1.0")]
+#![doc(html_root_url = "https://docs.rs/duck/0.2.0")]
 
 /// An extension trait that adds a `.peeking()` method to iterators.
 ///
