@@ -5,6 +5,11 @@
 //! *stacked*. This means that chaining multiple calls of `peeking` will
 //! increase the number of elements returned by `peek`.
 //!
+//! Note that this library will `.clone()` the elements that are peeked. While
+//! this is not strictly necessary, it does make the implementation much easier
+//! to understand, especially given the lack of [generic associated types][2] in
+//! current Rust.
+//!
 //! # Example
 //!
 //! ```rust
@@ -13,35 +18,36 @@
 //!
 //! // Since .peeking() is called twice, this iterator will peek two elements ahead
 //! let mut iter = anatids.into_iter().peeking().peeking();
-//! assert_eq!(iter.peek(), Some((&"duck", Some(&"goose"))));
+//! assert_eq!(iter.peek(), Some(("duck", Some("goose"))));
 //!
 //! // Step the iterator twice
 //! iter.next(); iter.next();
 //!
 //! // Now we're at "swan", which has no elements after it
-//! assert_eq!(iter.peek(), Some((&"swan", None)));
+//! assert_eq!(iter.peek(), Some(("swan", None)));
 //! ```
 //!
 //! [1]: https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.peekable
+//! [2]: https://github.com/rust-lang/rfcs/pull/1598
 
 #![doc(html_root_url = "https://docs.rs/duck/0.1.0")]
 
 /// An extension trait that adds a `.peeking()` method to iterators.
 ///
 /// See the top-level documentation for how to use this trait.
-pub trait PeekingExt: Iterator + Sized {
+pub trait PeekingExt: Iterator + Sized where <Self as Iterator>::Item: Clone {
     #[inline]
     fn peeking(self) -> Goose<Self> {
         Goose::new(self)
     }
 }
 
-impl<I: Iterator> PeekingExt for I {}
+impl<I: Iterator> PeekingExt for I where <I as Iterator>::Item: Clone {}
 
 /// An internal trait that represents either a `Duck` or a `Goose`.
-pub trait Anatid<'a>: Iterator {
-    type PeekItem: 'a;
-    fn peek(&'a mut self) -> Option<Self::PeekItem>;
+pub trait Anatid: Iterator {
+    type PeekItem;
+    fn peek(&mut self) -> Option<Self::PeekItem>;
 }
 
 // `Duck` and `Goose` have identical implementations for `Iterator`
@@ -117,7 +123,7 @@ pub struct Goose<I: Iterator> {
     peeked: Option<Option<I::Item>>,
 }
 
-impl<I: Iterator> Goose<I> {
+impl<I: Iterator> Goose<I> where I::Item: Clone {
     #[inline]
     fn new(iter: I) -> Self {
         Goose { iter, peeked: None }
@@ -125,7 +131,7 @@ impl<I: Iterator> Goose<I> {
 
     /// Inspect the next element of the iterator without consuming it.
     #[inline]
-    pub fn peek(&mut self) -> Option<&I::Item> {
+    pub fn peek(&mut self) -> Option<I::Item> {
         Anatid::peek(self)
     }
 
@@ -139,16 +145,16 @@ impl<I: Iterator> Goose<I> {
 impl_iterator!(Goose);
 
 // https://github.com/rust-lang/rust/blob/2e6334062e2be142125e99d63867711da505cc9e/src/libcore/iter/mod.rs#L1475-L1525
-impl<'a, I: Iterator> Anatid<'a> for Goose<I> where I::Item: 'a {
-    type PeekItem = &'a I::Item;
+impl<I: Iterator> Anatid for Goose<I> where I::Item: Clone {
+    type PeekItem = I::Item;
 
     #[inline]
-    fn peek(&'a mut self) -> Option<&'a I::Item> {
+    fn peek(&mut self) -> Option<I::Item> {
         if self.peeked.is_none() {
             self.peeked = Some(self.iter.next());
         }
         match self.peeked {
-            Some(Some(ref value)) => Some(value),
+            Some(Some(ref value)) => Some(value.clone()),
             Some(None) => None,
             _ => unreachable!(),
         }
@@ -162,7 +168,7 @@ pub struct Duck<I: Iterator> {
     peeked: Option<Option<I::Item>>,
 }
 
-impl<'a, I: Anatid<'a>> Duck<I> {
+impl<I: Anatid> Duck<I> where I::Item: Clone {
     #[inline]
     fn new(iter: I) -> Self {
         Duck { iter, peeked: None }
@@ -171,12 +177,10 @@ impl<'a, I: Anatid<'a>> Duck<I> {
     /// Inspect the next *n* elements in the iterator without consuming them,
     /// where *n* is the number of `Duck` or `Goose` types in the stack.
     #[inline]
-    pub fn peek(&'a mut self) -> Option<(&'a I::Item, Option<<I as Anatid<'a>>::PeekItem>)> {
+    pub fn peek(&mut self) -> Option<(I::Item, Option<I::PeekItem>)> {
         Anatid::peek(self)
     }
-}
 
-impl<'a, I: Anatid<'a>> Duck<I> where I::Item: 'a {
     /// Extends the iterator to peek one more element.
     #[inline]
     pub fn peeking(self) -> Duck<Self> {
@@ -187,16 +191,16 @@ impl<'a, I: Anatid<'a>> Duck<I> where I::Item: 'a {
 impl_iterator!(Duck);
 
 // https://github.com/rust-lang/rust/blob/2e6334062e2be142125e99d63867711da505cc9e/src/libcore/iter/mod.rs#L1475-L1525
-impl<'a, I: Anatid<'a>> Anatid<'a> for Duck<I> where I::Item: 'a {
-    type PeekItem = (&'a I::Item, Option<I::PeekItem>);
+impl<I: Anatid> Anatid for Duck<I> where I::Item: Clone {
+    type PeekItem = (I::Item, Option<I::PeekItem>);
 
     #[inline]
-    fn peek(&'a mut self) -> Option<Self::PeekItem> {
+    fn peek(&mut self) -> Option<Self::PeekItem> {
         if self.peeked.is_none() {
             self.peeked = Some(self.iter.next());
         }
         match self.peeked {
-            Some(Some(ref value)) => Some((value, self.iter.peek())),
+            Some(Some(ref value)) => Some((value.clone(), self.iter.peek())),
             Some(None) => None,
             _ => unreachable!(),
         }
@@ -207,11 +211,11 @@ impl<'a, I: Anatid<'a>> Anatid<'a> for Duck<I> where I::Item: 'a {
 fn simple() {
     let iter = vec![0, 1, 2].into_iter();
     let mut iter = iter.peeking().peeking().peeking();
-    assert_eq!(iter.peek(), Some((&0, Some((&1, Some(&2))))));
+    assert_eq!(iter.peek(), Some((0, Some((1, Some(2))))));
     assert_eq!(iter.next(), Some(0));
-    assert_eq!(iter.peek(), Some((&1, Some((&2, None)))));
+    assert_eq!(iter.peek(), Some((1, Some((2, None)))));
     assert_eq!(iter.next(), Some(1));
-    assert_eq!(iter.peek(), Some((&2, None)));
+    assert_eq!(iter.peek(), Some((2, None)));
     assert_eq!(iter.next(), Some(2));
     assert_eq!(iter.peek(), None);
     assert_eq!(iter.next(), None);
